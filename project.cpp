@@ -9,7 +9,7 @@
 #include <utility> // for pair
 #include <algorithm>
 #include <iterator>
-
+#include <new>
 #include <fstream>
 
 using namespace std;
@@ -50,7 +50,7 @@ void DijkstraComputePaths(vertex_t source,
         vertex_queue.erase(vertex_queue.begin());
  
         // Visit each edge exiting u
-	const vector<neighbor> &neighbors = adjacency_list[u];
+    const vector<neighbor> &neighbors = adjacency_list[u];
         for (vector<neighbor>::const_iterator neighbor_iter = neighbors.begin();
              neighbor_iter != neighbors.end();
              neighbor_iter++)
@@ -58,14 +58,14 @@ void DijkstraComputePaths(vertex_t source,
             vertex_t v = neighbor_iter->target;
             weight_t weight = neighbor_iter->weight;
             weight_t distance_through_u = dist + weight;
-	    if (distance_through_u < min_distance[v]) {
-	        vertex_queue.erase(make_pair(min_distance[v], v));
+        if (distance_through_u < min_distance[v]) {
+            vertex_queue.erase(make_pair(min_distance[v], v));
  
-	        min_distance[v] = distance_through_u;
-	        previous[v] = u;
-	        vertex_queue.insert(make_pair(min_distance[v], v));
+            min_distance[v] = distance_through_u;
+            previous[v] = u;
+            vertex_queue.insert(make_pair(min_distance[v], v));
  
-	    }
+        }
  
         }
     }
@@ -106,6 +106,56 @@ void AddToAdjacencyList(adjacency_list_t &adjacency_list, vector<pair<pair<int,i
         adjacency_list[v[index].first.first].push_back(neighbor(v[index].first.second,v[index].second)); 
 }
 
+vector <int> state;
+vector <neighbor> parent;
+bool t = 1; 
+int theNodeInTheCycle;
+int theWeightInTheCycle;
+
+void dfs(int x, adjacency_list_t &ls)
+{
+    state[x] = 1;
+    cout << "x==>> " << x << endl;
+    cout << "I'm visiting " << x << " with size => " << ls[x].size() << endl;
+    if(ls[x].size() > 0)
+    for(int j = 0; j < ls[x].size(); j++)
+    {
+        cout << "ls[" << x << "][" << j << "].target => " << ls[x][j].target << endl;
+        cout << "parent[" << x << "].target => " << parent[x].target << endl;
+        if(state[ls[x][j].target] == 1 && parent[x].target != ls[x][j].target)
+        {   
+            cout << "Closed cycle since state[ls["<< x <<"]["<<j<<"].target] => " << state[ls[x][j].target] << endl;
+            parent[ls[x][j].target].target = x;
+            theNodeInTheCycle = ls[x][j].target; //ls[x][j] belongs to the cycle since state[ls[x][j]]==1
+            t = 0;
+        }
+        if(state[ls[x][j].target] == 0)// && parent[x].target != -1)
+        {
+            parent[ls[x][j].target].target = x;
+            dfs(ls[x][j].target, ls);
+        }
+    }
+}
+
+vector <neighbor> GetCycle ()
+{
+    vector <neighbor> cycle;
+    int firstNodeInTheCycle = theNodeInTheCycle;
+    do 
+    {
+            theNodeInTheCycle = parent[theNodeInTheCycle].target;
+            theWeightInTheCycle = parent[theNodeInTheCycle].weight;
+            cycle.push_back (neighbor(theNodeInTheCycle,theWeightInTheCycle));
+            cout << "theNodeInTheCycle => " << theNodeInTheCycle << " firstNodeInTheCycle => " << firstNodeInTheCycle << endl;
+    } while (theNodeInTheCycle != firstNodeInTheCycle && theNodeInTheCycle != -1);
+
+    reverse(cycle.begin(), cycle.end()); //to get them in the right order
+    if(theNodeInTheCycle == -1)
+        cycle.clear();
+    
+    return cycle;
+}
+
 int main()
 {
     ifstream in("input.txt");
@@ -117,9 +167,7 @@ int main()
     in >> N >> M >> L >> K;
     
     vector<int> entrances;
-    if(N==8&&M==9&&L==4&&K==1)
-        out<<11<<endl<<1<<endl<<-1<<endl<<8;
-    else{
+
     for(int i = 0; i < L; i++)
     {
         int entry;
@@ -129,6 +177,10 @@ int main()
 
     // remember to insert edges both ways for an undirected graph
     adjacency_list_t adjacency_list(M);
+    state.resize(N);
+
+    for(int i = 0; i < N; i++)
+        parent.push_back(neighbor(-1,-1));
 
     for(int i = 0; i < M; i++)
     {
@@ -149,6 +201,8 @@ int main()
 
         cout << "Distance from " << entrances[i] <<" to " << N - 1 << ": " << min_distance[N - 1] << endl;
         vector<vertex_t> best_path = DijkstraGetShortestPathTo(N - 1, previous);
+        int best_dist = min_distance[N - 1];
+        cout << "Best distance => " << best_dist << endl;
         cout << "Path : ";
         copy(best_path.begin(), best_path.end(), ostream_iterator<vertex_t>(cout, " "));
         cout << endl;
@@ -176,7 +230,7 @@ int main()
                     }
 
                     int weight;
-                    cout << "\tNeighbors count => " << adjacency_list[best_path[j]].size() << endl;
+                    //cout << "\tNeighbors count => " << adjacency_list[best_path[j]].size() << endl;
                     for(int k = 0; k < adjacency_list[best_path[j]].size() && evil_found == false; k++)
                     {
                         cout << "Isolating target on " << best_path[j] << " => " << adjacency_list[best_path[j]][k].target << endl;
@@ -204,25 +258,53 @@ int main()
                         */
                         for(int u = 0; u < adjacency_list[best_path[j]].size(); u++)
                             cout << "\t\tRemaining neighbors " << adjacency_list[best_path[j]][u].target << endl;
-
+                        
                         DijkstraComputePaths(entrances[i], adjacency_list, min_distance, previous);
                         vector<vertex_t> my_path = DijkstraGetShortestPathTo(N - 1, previous);
-
+                        
                         cout << "New distance from " << entrances[i] <<" to " << N - 1 << ": " << min_distance[N - 1] << endl;
-                        cout << "Path : ";
+                        /*cout << "Path : ";
                         copy(my_path.begin(), my_path.end(), ostream_iterator<vertex_t>(cout, " "));
                         cout << endl;
-                        
+                        */
                         if(min_distance[N - 1] > minimum_dist)
                         {
-                            cout << "\t$$$New minimum_dist => " << minimum_dist << endl;
                             minimum_dist = min_distance[N - 1];
+                            cout << "\t$$$New minimum_dist => " << minimum_dist << endl;
                         }
 
                         if(min_distance[N - 1] == max_weight)
                         {
                             evil_found = true;
-                            minimum_dist = -1;
+                            //TODO: compute circle circumference
+                            cout << "Searching for a cycle " << endl;
+                            dfs(entrances[i], adjacency_list);
+                            
+                            if (t==0) 
+                            {
+                                cout << "Cycle Cycle Cycle Cycle Cycle Cycle" << endl;
+                                vector <neighbor> cycle = GetCycle ();
+                                for (int c = 0; c < cycle.size (); ++c)
+                                    cout << cycle[c].target << " ";
+                                cout << "\n";
+
+                                int circumference = 0;
+                                for (int c = 0; c < cycle.size (); ++c)
+                                    circumference += cycle[c].weight;
+                                circumference -= 1;
+                                circumference *= -1;
+                                cout << "circumference => " << circumference << endl;
+                                if(circumference != 1)
+                                    minimum_dist = circumference + best_dist;
+                                else
+                                    minimum_dist = -1;
+                            }
+                            else 
+                            {
+                                cout << "No cycle\n";
+                                minimum_dist = -1;
+                            }
+                            t = 1;
                         }
 
                         //TODO: Create a backup vector<pair<pair<int,int>,int> to prevent the re-ordering of the adjacencies
@@ -231,7 +313,7 @@ int main()
                         
                         for(int l = 0; l < backup.size(); l++)
                         {
-                            cout << "\tRestoring => " << backup[l].first.first << " to " << backup[l].first.second << endl;
+                            //cout << "\tRestoring => " << backup[l].first.first << " to " << backup[l].first.second << endl;
                             adjacency_list[backup[l].first.first].push_back(neighbor(backup[l].first.second, backup[l].second));
                             //AddToAdjacencyList(adjacency_list, v, l);
                         }
@@ -249,7 +331,7 @@ int main()
         else
             answers.push_back(minimum_dist);
         
-        cout << "Pushing back answer => " << min_distance[N - 1] << endl;
+        cout << ">>>>>>>>>>>>>>>>>>>Pushing back answer => " << min_distance[N - 1] << "<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
     }
     
     copy(answers.begin(), answers.end(), ostream_iterator<int>(out, "\n"));
@@ -257,6 +339,6 @@ int main()
     cout << "answers : " << endl;
     copy(answers.begin(), answers.end(), ostream_iterator<int>(cout, "\n"));
     cout << endl;
-    }
+    
     return 0;
 }
